@@ -30,6 +30,8 @@ function MarketStatusBadge({ status }) {
   return <span className={`market-badge ${cls}`}>{label}</span>;
 }
 
+const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Advisor'];
+
 // ── Live Dot ──────────────────────────────────────────────────────────
 
 function LiveDot({ active }) {

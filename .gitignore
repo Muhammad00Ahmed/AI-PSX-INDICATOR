@@ -1,0 +1,7 @@
+node_modules/
+package.json
+package-lock.json
+frontend/dist/
+frontend/.env.local
+render-cli-bin/
+render-cli.zip
