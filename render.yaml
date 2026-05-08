@@ -2,6 +2,7 @@ services:
   - type: web
     name: psx-market-engine-backend
     runtime: node
+    rootDirectory: backend
     buildCommand: npm install && npx playwright install chromium --with-deps
     startCommand: npm start
     envVars:
