@@ -129,41 +129,119 @@ function Sparkline({ candles, w = 80, h = 28 }) {
   );
 }
 
-// ── Chart (Lightweight Charts) ────────────────────────────────────────
+// ── Enhanced Chart (Lightweight Charts) ────────────────────────────────────────
 
 function CandleChart({ symbol }) {
   const { candles, loading } = useCandleData(symbol, 60, 200);
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const seriesRef    = useRef(null);
+  const volumeRef    = useRef(null);
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    import('lightweight-charts').then(({ createChart }) => {
+    import('lightweight-charts').then(({ createChart, ColorType }) => {
       if (chartRef.current) { chartRef.current.remove(); }
 
+      const isDark = theme === 'dark';
       const chart = createChart(containerRef.current, {
         width:  containerRef.current.clientWidth,
-        height: 320,
-        layout: { background: { color: '#ffffff' }, textColor: '#374151' },
-        grid:   { vertLines: { color: '#e5e7eb' }, horzLines: { color: '#e5e7eb' } },
-        crosshair: { mode: 1 },
-        rightPriceScale: { borderColor: '#334155' },
-        timeScale:       { borderColor: '#334155', timeVisible: true },
+        height: 400,
+        layout: {
+          background: {
+            type: ColorType.Solid,
+            color: isDark ? '#0f172a' : '#ffffff'
+          },
+          textColor: isDark ? '#e2e8f0' : '#374151',
+          fontSize: 12,
+          fontFamily: "'Inter', sans-serif"
+        },
+        grid: {
+          vertLines: { color: isDark ? '#334155' : '#e5e7eb' },
+          horzLines: { color: isDark ? '#334155' : '#e5e7eb' }
+        },
+        crosshair: {
+          mode: 1,
+          vertLine: { color: isDark ? '#64748b' : '#9ca3af' },
+          horzLine: { color: isDark ? '#64748b' : '#9ca3af' }
+        },
+        rightPriceScale: {
+          borderColor: isDark ? '#475569' : '#d1d5db',
+          textColor: isDark ? '#cbd5e1' : '#6b7280'
+        },
+        timeScale: {
+          borderColor: isDark ? '#475569' : '#d1d5db',
+          timeVisible: true,
+          secondsVisible: false,
+          textColor: isDark ? '#cbd5e1' : '#6b7280'
+        },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true
+        },
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true
+        }
       });
 
+      // Candlestick series
       const series = chart.addCandlestickSeries({
-        upColor:     '#22c55e',
-        downColor:   '#ef4444',
-        borderUpColor:   '#22c55e',
-        borderDownColor: '#ef4444',
-        wickUpColor:   '#22c55e',
-        wickDownColor: '#ef4444',
+        upColor: '#22c55e',
+        downColor: '#ef4444',
+        borderUpColor: '#16a34a',
+        borderDownColor: '#dc2626',
+        wickUpColor: '#16a34a',
+        wickDownColor: '#dc2626',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+          minMove: 0.01,
+        },
+      });
+
+      // Volume series
+      const volumeSeries = chart.addHistogramSeries({
+        color: isDark ? '#64748b' : '#9ca3af',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '',
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
+        },
+      });
+
+      // Moving averages
+      const sma20 = chart.addLineSeries({
+        color: '#3b82f6',
+        lineWidth: 1,
+        title: 'SMA 20',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+        },
+      });
+
+      const sma50 = chart.addLineSeries({
+        color: '#f59e0b',
+        lineWidth: 1,
+        title: 'SMA 50',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+        },
       });
 
       chartRef.current  = chart;
       seriesRef.current = series;
+      volumeRef.current = volumeSeries;
 
       if (candles.length) {
         const data = candles.map(c => ({
@@ -173,21 +251,90 @@ function CandleChart({ symbol }) {
           low:   c.low,
           close: c.close,
         })).filter(c => c.open && c.high && c.low && c.close);
-        if (data.length) series.setData(data);
+
+        const volumeData = candles.map(c => ({
+          time: Math.floor(c.time / 1000),
+          value: c.volume || 0,
+          color: (c.close >= c.open) ? '#22c55e' : '#ef4444'
+        })).filter(v => v.value > 0);
+
+        if (data.length) {
+          series.setData(data);
+          volumeSeries.setData(volumeData);
+
+          // Calculate and set moving averages
+          if (data.length >= 50) {
+            const prices = data.map(d => d.close);
+            const sma20Data = [];
+            const sma50Data = [];
+
+            for (let i = 19; i < prices.length; i++) {
+              const sma20Value = prices.slice(i - 19, i + 1).reduce((sum, p) => sum + p, 0) / 20;
+              sma20Data.push({ time: data[i].time, value: sma20Value });
+            }
+
+            for (let i = 49; i < prices.length; i++) {
+              const sma50Value = prices.slice(i - 49, i + 1).reduce((sum, p) => sum + p, 0) / 50;
+              sma50Data.push({ time: data[i].time, value: sma50Value });
+            }
+
+            sma20.setData(sma20Data);
+            sma50.setData(sma50Data);
+          }
+        }
       }
+
+      // Add legend
+      const legend = document.createElement('div');
+      legend.style.cssText = `
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: ${isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
+        border: 1px solid ${isDark ? '#475569' : '#e5e7eb'};
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-family: 'Inter', sans-serif;
+        color: ${isDark ? '#e2e8f0' : '#374151'};
+        z-index: 100;
+        backdrop-filter: blur(8px);
+      `;
+      legend.innerHTML = `
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></div>
+            <span>Candles</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 2px; background: #3b82f6;"></div>
+            <span>SMA 20</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 2px; background: #f59e0b;"></div>
+            <span>SMA 50</span>
+          </div>
+        </div>
+      `;
+      containerRef.current.appendChild(legend);
 
       const obs = new ResizeObserver(() => {
         chart.applyOptions({ width: containerRef.current?.clientWidth || 600 });
       });
       obs.observe(containerRef.current);
 
-      return () => { obs.disconnect(); chart.remove(); };
+      return () => {
+        obs.disconnect();
+        if (legend.parentNode) legend.parentNode.removeChild(legend);
+        chart.remove();
+      };
     });
-  }, [symbol]);
+  }, [symbol, theme]);
 
   // Update series when candles change
   useEffect(() => {
-    if (!seriesRef.current || !candles.length) return;
+    if (!seriesRef.current || !volumeRef.current || !candles.length) return;
+
     const data = candles.map(c => ({
       time:  Math.floor(c.time / 1000),
       open:  c.open,
@@ -195,74 +342,262 @@ function CandleChart({ symbol }) {
       low:   c.low,
       close: c.close,
     })).filter(c => c.open && c.high && c.low && c.close);
-    if (data.length) seriesRef.current.setData(data);
+
+    const volumeData = candles.map(c => ({
+      time: Math.floor(c.time / 1000),
+      value: c.volume || 0,
+      color: (c.close >= c.open) ? '#22c55e' : '#ef4444'
+    })).filter(v => v.value > 0);
+
+    if (data.length) {
+      seriesRef.current.setData(data);
+      volumeRef.current.setData(volumeData);
+    }
   }, [candles]);
 
   return (
     <div className="chart-wrap">
-      {loading && <div className="chart-loading">Loading chart…</div>}
-      <div ref={containerRef} className="chart-container" />
+      {loading && <div className="chart-loading">Loading enhanced chart…</div>}
+      <div className="chart-controls" style={{ marginBottom: '10px' }}>
+        <button
+          className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
+          onClick={() => setTheme('light')}
+        >
+          ☀️ Light
+        </button>
+        <button
+          className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
+          onClick={() => setTheme('dark')}
+        >
+          🌙 Dark
+        </button>
+      </div>
+      <div ref={containerRef} className="chart-container" style={{ borderRadius: '8px', overflow: 'hidden' }} />
     </div>
   );
 }
 
-// ── Line Chart ────────────────────────────────────────────────────────
+// ── Enhanced Line Chart ────────────────────────────────────────────────────────
 
 function LineChart({ symbol }) {
   const { candles, loading } = useCandleData(symbol, 60, 200);
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const seriesRef    = useRef(null);
+  const volumeRef    = useRef(null);
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    import('lightweight-charts').then(({ createChart }) => {
+    import('lightweight-charts').then(({ createChart, ColorType }) => {
       if (chartRef.current) { chartRef.current.remove(); }
 
+      const isDark = theme === 'dark';
       const chart = createChart(containerRef.current, {
         width:  containerRef.current.clientWidth,
-        height: 320,
-        layout: { background: { color: '#ffffff' }, textColor: '#374151' },
-        grid:   { vertLines: { color: '#e5e7eb' }, horzLines: { color: '#e5e7eb' } },
-        crosshair: { mode: 1 },
-        rightPriceScale: { borderColor: '#334155' },
-        timeScale:       { borderColor: '#334155', timeVisible: true },
+        height: 400,
+        layout: {
+          background: {
+            type: ColorType.Solid,
+            color: isDark ? '#0f172a' : '#ffffff'
+          },
+          textColor: isDark ? '#e2e8f0' : '#374151',
+          fontSize: 12,
+          fontFamily: "'Inter', sans-serif"
+        },
+        grid: {
+          vertLines: { color: isDark ? '#334155' : '#e5e7eb' },
+          horzLines: { color: isDark ? '#334155' : '#e5e7eb' }
+        },
+        crosshair: {
+          mode: 1,
+          vertLine: { color: isDark ? '#64748b' : '#9ca3af' },
+          horzLine: { color: isDark ? '#64748b' : '#9ca3af' }
+        },
+        rightPriceScale: {
+          borderColor: isDark ? '#475569' : '#d1d5db',
+          textColor: isDark ? '#cbd5e1' : '#6b7280'
+        },
+        timeScale: {
+          borderColor: isDark ? '#475569' : '#d1d5db',
+          timeVisible: true,
+          secondsVisible: false,
+          textColor: isDark ? '#cbd5e1' : '#6b7280'
+        },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true
+        },
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true
+        }
       });
 
+      // Line series with gradient
       const series = chart.addLineSeries({
         color: '#3b82f6',
-        lineWidth: 2,
+        lineWidth: 3,
         priceFormat: {
           type: 'price',
           precision: 2,
           minMove: 0.01,
         },
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 6,
+        crosshairMarkerBorderColor: '#3b82f6',
+        crosshairMarkerBackgroundColor: isDark ? '#0f172a' : '#ffffff',
+        lineType: 0, // Simple line
+      });
+
+      // Volume series
+      const volumeSeries = chart.addHistogramSeries({
+        color: isDark ? '#64748b' : '#9ca3af',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: '',
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
+        },
+      });
+
+      // Bollinger Bands
+      const upperBand = chart.addLineSeries({
+        color: '#ef4444',
+        lineWidth: 1,
+        title: 'BB Upper',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+        },
+      });
+
+      const lowerBand = chart.addLineSeries({
+        color: '#22c55e',
+        lineWidth: 1,
+        title: 'BB Lower',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+        },
+      });
+
+      const middleBand = chart.addLineSeries({
+        color: '#f59e0b',
+        lineWidth: 1,
+        title: 'BB Middle (SMA 20)',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+        },
       });
 
       chartRef.current  = chart;
       seriesRef.current = series;
+      volumeRef.current = volumeSeries;
 
       if (candles.length) {
         const data = candles.map(c => ({
           time:  Math.floor(c.time / 1000),
           value: c.close,
         })).filter(c => c.value && Number.isFinite(c.value));
-        if (data.length) series.setData(data);
+
+        const volumeData = candles.map(c => ({
+          time: Math.floor(c.time / 1000),
+          value: c.volume || 0,
+          color: (c.close >= (candles[candles.indexOf(c) - 1]?.close || c.close)) ? '#22c55e' : '#ef4444'
+        })).filter(v => v.value > 0);
+
+        if (data.length) {
+          series.setData(data);
+          volumeSeries.setData(volumeData);
+
+          // Calculate Bollinger Bands
+          if (data.length >= 20) {
+            const prices = data.map(d => d.value);
+            const bbData = [];
+
+            for (let i = 19; i < prices.length; i++) {
+              const slice = prices.slice(i - 19, i + 1);
+              const sma = slice.reduce((sum, p) => sum + p, 0) / 20;
+              const variance = slice.reduce((sum, p) => sum + Math.pow(p - sma, 2), 0) / 20;
+              const stdDev = Math.sqrt(variance);
+
+              bbData.push({
+                time: data[i].time,
+                upper: sma + (2 * stdDev),
+                middle: sma,
+                lower: sma - (2 * stdDev)
+              });
+            }
+
+            upperBand.setData(bbData.map(d => ({ time: d.time, value: d.upper })));
+            middleBand.setData(bbData.map(d => ({ time: d.time, value: d.middle })));
+            lowerBand.setData(bbData.map(d => ({ time: d.time, value: d.lower })));
+          }
+        }
       }
+
+      // Add legend
+      const legend = document.createElement('div');
+      legend.style.cssText = `
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: ${isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
+        border: 1px solid ${isDark ? '#475569' : '#e5e7eb'};
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-family: 'Inter', sans-serif;
+        color: ${isDark ? '#e2e8f0' : '#374151'};
+        z-index: 100;
+        backdrop-filter: blur(8px);
+      `;
+      legend.innerHTML = `
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 3px; background: #3b82f6;"></div>
+            <span>Price</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 2px; background: #f59e0b;"></div>
+            <span>BB Middle</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 2px; background: #ef4444;"></div>
+            <span>BB Upper</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <div style="width: 12px; height: 2px; background: #22c55e;"></div>
+            <span>BB Lower</span>
+          </div>
+        </div>
+      `;
+      containerRef.current.appendChild(legend);
 
       const obs = new ResizeObserver(() => {
         chart.applyOptions({ width: containerRef.current?.clientWidth || 600 });
       });
       obs.observe(containerRef.current);
 
-      return () => { obs.disconnect(); chart.remove(); };
+      return () => {
+        obs.disconnect();
+        if (legend.parentNode) legend.parentNode.removeChild(legend);
+        chart.remove();
+      };
     });
-  }, [symbol]);
+  }, [symbol, theme]);
 
   // Update series when candles change
   useEffect(() => {
-    if (!seriesRef.current || !candles.length) return;
+    if (!seriesRef.current || !volumeRef.current || !candles.length) return;
     const data = candles.map(c => ({
       time:  Math.floor(c.time / 1000),
       value: c.close,
@@ -272,8 +607,22 @@ function LineChart({ symbol }) {
 
   return (
     <div className="chart-wrap">
-      {loading && <div className="chart-loading">Loading chart…</div>}
-      <div ref={containerRef} className="chart-container" />
+      {loading && <div className="chart-loading">Loading enhanced line chart…</div>}
+      <div className="chart-controls" style={{ marginBottom: '10px' }}>
+        <button
+          className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
+          onClick={() => setTheme('light')}
+        >
+          ☀️ Light
+        </button>
+        <button
+          className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
+          onClick={() => setTheme('dark')}
+        >
+          🌙 Dark
+        </button>
+      </div>
+      <div ref={containerRef} className="chart-container" style={{ borderRadius: '8px', overflow: 'hidden' }} />
     </div>
   );
 }
@@ -362,9 +711,245 @@ function Heatmap({ stocks }) {
   );
 }
 
-// ── Main App ──────────────────────────────────────────────────────────
+// ── Market Advisor ──────────────────────────────────────────────────
 
-const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Chart'];
+function MarketAdvisor({ market, portfolio }) {
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null);
+
+  const recommendations = useMemo(() => {
+    const recs = [];
+    const stocks = market.stocks.filter(s => s.price > 0 && !s.isDebt);
+
+    // Top gainers with momentum
+    const gainers = stocks
+      .filter(s => s.changePercent > 2 && s.volume > 100000)
+      .sort((a, b) => b.changePercent - a.changePercent)
+      .slice(0, 5);
+
+    gainers.forEach(stock => {
+      recs.push({
+        type: 'BUY',
+        symbol: stock.symbol,
+        company: stock.companyName,
+        reason: `Strong momentum with ${stock.changePercent.toFixed(2)}% gain and high volume`,
+        confidence: Math.min(85, 60 + stock.changePercent),
+        price: stock.price,
+        change: stock.changePercent,
+        sector: stock.sector,
+        action: 'Consider buying for short-term gains'
+      });
+    });
+
+    // Oversold stocks (potential bounce)
+    const oversold = stocks
+      .filter(s => s.changePercent < -3 && s.price > 1)
+      .sort((a, b) => a.changePercent - b.changePercent)
+      .slice(0, 3);
+
+    oversold.forEach(stock => {
+      recs.push({
+        type: 'BUY',
+        symbol: stock.symbol,
+        company: stock.companyName,
+        reason: `Oversold with ${Math.abs(stock.changePercent).toFixed(2)}% decline - potential bounce`,
+        confidence: Math.min(75, 50 + Math.abs(stock.changePercent)),
+        price: stock.price,
+        change: stock.changePercent,
+        sector: stock.sector,
+        action: 'Watch for reversal signals'
+      });
+    });
+
+    // High volume breakouts
+    const breakouts = stocks
+      .filter(s => s.volume > 500000 && s.changePercent > 1)
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 3);
+
+    breakouts.forEach(stock => {
+      recs.push({
+        type: 'BUY',
+        symbol: stock.symbol,
+        company: stock.companyName,
+        reason: `High volume breakout with ${fmtV(stock.volume)} traded`,
+        confidence: 70,
+        price: stock.price,
+        change: stock.changePercent,
+        sector: stock.sector,
+        action: 'Strong institutional interest detected'
+      });
+    });
+
+    // Portfolio recommendations
+    portfolio.forEach(holding => {
+      const stock = market.getStock(holding.symbol);
+      if (!stock) return;
+
+      const currentValue = stock.price * holding.quantity;
+      const investedValue = holding.buyPrice * holding.quantity;
+      const pl = currentValue - investedValue;
+      const plPct = ((stock.price / holding.buyPrice) - 1) * 100;
+
+      if (plPct > 20) {
+        recs.push({
+          type: 'SELL',
+          symbol: stock.symbol,
+          company: stock.companyName,
+          reason: `Portfolio holding up ${plPct.toFixed(2)}% - consider taking profits`,
+          confidence: Math.min(90, 70 + plPct / 2),
+          price: stock.price,
+          change: stock.changePercent,
+          sector: stock.sector,
+          action: 'Consider partial profit booking'
+        });
+      } else if (plPct < -15) {
+        recs.push({
+          type: 'HOLD',
+          symbol: stock.symbol,
+          company: stock.companyName,
+          reason: `Portfolio holding down ${Math.abs(plPct).toFixed(2)}% - hold for recovery`,
+          confidence: 60,
+          price: stock.price,
+          change: stock.changePercent,
+          sector: stock.sector,
+          action: 'Hold through volatility, monitor fundamentals'
+        });
+      }
+    });
+
+    // Market sentiment analysis
+    const positiveStocks = stocks.filter(s => s.changePercent > 0).length;
+    const totalStocks = stocks.length;
+    const bullishRatio = (positiveStocks / totalStocks) * 100;
+
+    if (bullishRatio > 70) {
+      recs.unshift({
+        type: 'MARKET',
+        symbol: 'MARKET',
+        company: 'Market Sentiment',
+        reason: `${bullishRatio.toFixed(1)}% of stocks are positive - bullish market`,
+        confidence: bullishRatio,
+        action: 'Market showing strong bullish momentum'
+      });
+    } else if (bullishRatio < 30) {
+      recs.unshift({
+        type: 'MARKET',
+        symbol: 'MARKET',
+        company: 'Market Sentiment',
+        reason: `Only ${bullishRatio.toFixed(1)}% of stocks are positive - bearish market`,
+        confidence: 100 - bullishRatio,
+        action: 'Exercise caution, focus on defensive stocks'
+      });
+    }
+
+    return recs.slice(0, 15); // Limit to top 15 recommendations
+  }, [market.stocks, portfolio]);
+
+  const getTypeColor = (type) => {
+    switch (type) {
+      case 'BUY': return '#22c55e';
+      case 'SELL': return '#ef4444';
+      case 'HOLD': return '#f59e0b';
+      case 'MARKET': return '#3b82f6';
+      default: return '#6b7280';
+    }
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'BUY': return '🟢';
+      case 'SELL': return '🔴';
+      case 'HOLD': return '🟡';
+      case 'MARKET': return '📊';
+      default: return '💭';
+    }
+  };
+
+  return (
+    <div className="advisor-tab">
+      <div className="advisor-header">
+        <h3 className="section-title">🤖 AI Market Advisor</h3>
+        <p className="advisor-subtitle">Smart recommendations based on market data analysis</p>
+      </div>
+
+      <div className="advisor-stats">
+        <div className="advisor-stat">
+          <span className="stat-label">Market Sentiment</span>
+          <span className="stat-value">
+            {market.stocks.filter(s => s.changePercent > 0).length}/{market.stocks.length} Positive
+          </span>
+        </div>
+        <div className="advisor-stat">
+          <span className="stat-label">Portfolio Holdings</span>
+          <span className="stat-value">{portfolio.length} Stocks</span>
+        </div>
+        <div className="advisor-stat">
+          <span className="stat-label">Last Update</span>
+          <span className="stat-value">
+            {market.lastUpdate ? new Date(market.lastUpdate).toLocaleTimeString('en-PK') : '—'}
+          </span>
+        </div>
+      </div>
+
+      <div className="recommendations-grid">
+        {recommendations.map((rec, index) => (
+          <div
+            key={`${rec.symbol}-${index}`}
+            className={`recommendation-card ${selectedRecommendation === index ? 'selected' : ''}`}
+            onClick={() => setSelectedRecommendation(selectedRecommendation === index ? null : index)}
+          >
+            <div className="rec-header">
+              <div className="rec-type" style={{ backgroundColor: getTypeColor(rec.type) }}>
+                {getTypeIcon(rec.type)} {rec.type}
+              </div>
+              <div className="rec-symbol">{rec.symbol}</div>
+            </div>
+
+            <div className="rec-company">{rec.company}</div>
+
+            <div className="rec-confidence">
+              <div className="confidence-bar">
+                <div
+                  className="confidence-fill"
+                  style={{ width: `${rec.confidence}%`, backgroundColor: getTypeColor(rec.type) }}
+                ></div>
+              </div>
+              <span className="confidence-text">{rec.confidence.toFixed(0)}% Confidence</span>
+            </div>
+
+            {rec.price && (
+              <div className="rec-price">
+                ₨{fmt(rec.price)}
+                {rec.change && (
+                  <span className={rec.change >= 0 ? 'text-up' : 'text-down'}>
+                    {' '}({rec.change >= 0 ? '+' : ''}{fmt(rec.change)}%)
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="rec-reason">{rec.reason}</div>
+
+            {selectedRecommendation === index && (
+              <div className="rec-details">
+                <div className="rec-action">{rec.action}</div>
+                {rec.sector && <div className="rec-sector">Sector: {rec.sector}</div>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {recommendations.length === 0 && (
+        <div className="advisor-empty">
+          <div className="empty-icon">🤖</div>
+          <p>Analyzing market data...</p>
+          <small>Recommendations will appear as market data becomes available</small>
+        </div>
+      )}
+    </div>
+  );
+}
 const SORT_FIELDS = ['symbol', 'price', 'changePercent', 'volume', 'high', 'low'];
 
 export default function App() {
@@ -380,6 +965,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [chartType, setChartType] = useState('candle');
+  const [formStock, setFormStock] = useState(null);
+  const [formQty, setFormQty] = useState('');
+  const [formBuyPrice, setFormBuyPrice] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const openAddForm = (stock) => {
     setFormStock(stock);
@@ -702,40 +1291,8 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'Chart' && (
-            <div className="chart-tab">
-              <div className="chart-controls">
-                <h3 className="section-title">Stock Charts</h3>
-                {selectedStock && (
-                  <div className="chart-type-toggle">
-                    <button
-                      className={`chart-type-btn ${chartType === 'candle' ? 'active' : ''}`}
-                      onClick={() => setChartType('candle')}
-                    >
-                      📊 Candle
-                    </button>
-                    <button
-                      className={`chart-type-btn ${chartType === 'line' ? 'active' : ''}`}
-                      onClick={() => setChartType('line')}
-                    >
-                      📈 Line
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {!selectedStock ? (
-                <div className="chart-placeholder">
-                  <div className="chart-placeholder-icon">📈</div>
-                  <p>Select a stock from the Market tab to view its chart</p>
-                </div>
-              ) : (
-                <>
-                  {chartType === 'candle' && <CandleChart symbol={selectedStock.symbol} />}
-                  {chartType === 'line' && <LineChart symbol={selectedStock.symbol} />}
-                </>
-              )}
-            </div>
+          {tab === 'Advisor' && (
+            <MarketAdvisor market={market} portfolio={portfolio} />
           )}
         </div>
       </main>
