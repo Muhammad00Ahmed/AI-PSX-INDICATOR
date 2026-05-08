@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
+const DEFAULT_BACKEND = 'https://ai-psx-indicator-1.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || (
+  window.location.hostname.includes('vercel.app')
+    ? DEFAULT_BACKEND
+    : `${window.location.protocol}//${window.location.hostname}:3001`
+);
 
 export function useCandleData(symbol, intervalSec = 60, limit = 200) {
   const [candles, setCandles] = useState([]);

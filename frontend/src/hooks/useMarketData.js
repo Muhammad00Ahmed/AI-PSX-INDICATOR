@@ -1,8 +1,16 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
-const WS_BASE  = import.meta.env.VITE_WS_URL  ||
-  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:3001`;
+const DEFAULT_BACKEND = 'https://ai-psx-indicator-1.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || (
+  window.location.hostname.includes('vercel.app')
+    ? `${DEFAULT_BACKEND}/api`
+    : ''
+);
+const WS_BASE = import.meta.env.VITE_WS_URL || (
+  window.location.hostname.includes('vercel.app')
+    ? 'wss://ai-psx-indicator-1.onrender.com'
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:3001`
+);
 
 // ── Normalization ──────────────────────────────────────────────────────
 
