@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: psx-market-engine-backend
+    runtime: node
+    buildCommand: npm install && npx playwright install chromium --with-deps
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGINS
+        value: https://ai-psx-indicator.vercel.app,http://localhost:5173,http://localhost:3000
+    plan: starter
+    autoDeploy: true

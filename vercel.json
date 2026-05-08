@@ -7,17 +7,13 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "backend/server.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "backend/server.js" },
     { "src": "/(.*)", "dest": "frontend/dist/$1" }
   ],
   "env": {
-    "ANTHROPIC_API_KEY": "@anthropic_api_key"
+    "VITE_API_URL": "https://psx-market-engine-backend.onrender.com/api",
+    "VITE_WS_URL": "wss://psx-market-engine-backend.onrender.com"
   }
 }
