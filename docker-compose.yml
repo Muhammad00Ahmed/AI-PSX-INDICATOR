@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: psx-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: psx-backend
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - REDIS_URL=redis://redis:6379
+      - ENABLE_PLAYWRIGHT=true
+      - LOG_LEVEL=info
+    volumes:
+      - /dev/shm:/dev/shm   # needed for Chromium
+    shm_size: '512mb'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: psx-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+    environment:
+      - VITE_API_URL=http://backend:3001
+      - VITE_WS_URL=ws://backend:3001
+
+volumes:
+  redis_data:
