@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const { round } = require('../utils/numbers');
 
 const MAX_TICKS_PER_SYMBOL = Number(process.env.MAX_TICKS_PER_SYMBOL) || 1440;
-const CANDLE_INTERVALS_SEC = (process.env.CANDLE_INTERVALS || '60,300,900,3600')
+const CANDLE_INTERVALS_SEC = (process.env.CANDLE_INTERVALS || '60,300,900,3600,14400,86400')
   .split(',').map(Number).filter(Boolean);
 
 /**

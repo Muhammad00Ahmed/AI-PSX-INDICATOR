@@ -288,6 +288,54 @@ body {
   box-shadow: 0 2px 8px rgba(59,130,246,0.3);
 }
 
+.price-history-panel {
+  margin: 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.price-history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.range-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.range-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.range-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.range-btn:hover {
+  background: var(--bg-3);
+}
+
+.price-history-panel .chart-type-toggle {
+  display: flex;
+  gap: 8px;
+}
+
 .chart-placeholder {
   flex: 1;
   display: flex;

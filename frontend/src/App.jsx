@@ -31,6 +31,12 @@ function MarketStatusBadge({ status }) {
 }
 
 const TABS = ['Market', 'Gainers/Losers', 'Heatmap', 'Portfolio', 'Advisor'];
+const RANGE_OPTIONS = [
+  { id: '1w', label: '1W', intervalSec: 3600, limit: 168 },
+  { id: '1m', label: '1M', intervalSec: 14400, limit: 180 },
+  { id: '3m', label: '3M', intervalSec: 86400, limit: 90 },
+  { id: '1y', label: '1Y', intervalSec: 86400, limit: 365 },
+];
 
 // ── Live Dot ──────────────────────────────────────────────────────────
 
@@ -133,8 +139,8 @@ function Sparkline({ candles, w = 80, h = 28 }) {
 
 // ── Enhanced Chart (Lightweight Charts) ────────────────────────────────────────
 
-function CandleChart({ symbol }) {
-  const { candles, loading } = useCandleData(symbol, 60, 200);
+function CandleChart({ symbol, intervalSec = 60, limit = 200 }) {
+  const { candles, loading } = useCandleData(symbol, intervalSec, limit);
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const seriesRef    = useRef(null);
@@ -381,8 +387,8 @@ function CandleChart({ symbol }) {
 
 // ── Enhanced Line Chart ────────────────────────────────────────────────────────
 
-function LineChart({ symbol }) {
-  const { candles, loading } = useCandleData(symbol, 60, 200);
+function LineChart({ symbol, intervalSec = 60, limit = 200 }) {
+  const { candles, loading } = useCandleData(symbol, intervalSec, limit);
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const seriesRef    = useRef(null);
@@ -630,6 +636,43 @@ function LineChart({ symbol }) {
 }
 
 // ── Stock Row ─────────────────────────────────────────────────────────
+
+function PriceChartPanel({ symbol, chartType, setChartType, timeRange, setTimeRange }) {
+  const selectedRange = RANGE_OPTIONS.find(r => r.id === timeRange) || RANGE_OPTIONS[0];
+  return (
+    <div className="price-history-panel">
+      <div className="price-history-toolbar">
+        <div className="range-buttons">
+          {RANGE_OPTIONS.map(range => (
+            <button
+              key={range.id}
+              className={`range-btn ${timeRange === range.id ? 'active' : ''}`}
+              onClick={() => setTimeRange(range.id)}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+        <div className="chart-type-toggle">
+          <button className={`chart-type-btn ${chartType === 'candle' ? 'active' : ''}`} onClick={() => setChartType('candle')}>Candles</button>
+          <button className={`chart-type-btn ${chartType === 'line' ? 'active' : ''}`} onClick={() => setChartType('line')}>Line</button>
+        </div>
+      </div>
+      <PriceChart
+        symbol={symbol}
+        chartType={chartType}
+        intervalSec={selectedRange.intervalSec}
+        limit={selectedRange.limit}
+      />
+    </div>
+  );
+}
+
+function PriceChart({ symbol, chartType, intervalSec, limit }) {
+  return chartType === 'line'
+    ? <LineChart symbol={symbol} intervalSec={intervalSec} limit={limit} />
+    : <CandleChart symbol={symbol} intervalSec={intervalSec} limit={limit} />;
+}
 
 const StockRow = memo(function StockRow({ stock, onClick, selected, onAddToPortfolio, inPortfolio }) {
   const up = stock.changePercent >= 0;
@@ -967,6 +1010,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [chartType, setChartType] = useState('candle');
+  const [timeRange, setTimeRange] = useState('1w');
   const [formStock, setFormStock] = useState(null);
   const [formQty, setFormQty] = useState('');
   const [formBuyPrice, setFormBuyPrice] = useState('');
@@ -1097,7 +1141,13 @@ export default function App() {
               <div><span>Volume</span><b>{fmtV(selectedStock.volume)}</b></div>
               <div><span>Sector</span><b>{selectedStock.sector || '—'}</b></div>
             </div>
-            <CandleChart symbol={selectedStock.symbol} />
+            <PriceChartPanel
+              symbol={selectedStock.symbol}
+              chartType={chartType}
+              setChartType={setChartType}
+              timeRange={timeRange}
+              setTimeRange={setTimeRange}
+            />
           </aside>
         )}
 
