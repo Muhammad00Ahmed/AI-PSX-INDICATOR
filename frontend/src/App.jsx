@@ -183,7 +183,16 @@ function CandleChart({ symbol, intervalSec = 60, limit = 200 }) {
           borderColor: isDark ? '#475569' : '#d1d5db',
           timeVisible: true,
           secondsVisible: false,
-          textColor: isDark ? '#cbd5e1' : '#6b7280'
+          textColor: isDark ? '#cbd5e1' : '#6b7280',
+          tickMarkFormatter: (time) => {
+            if (typeof time === 'object') {
+              const month = String(time.month).padStart(2, '0');
+              const day = String(time.day).padStart(2, '0');
+              return `${day}/${month}`;
+            }
+            const date = new Date(time * 1000);
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+          }
         },
         handleScroll: {
           mouseWheel: true,
@@ -431,7 +440,16 @@ function LineChart({ symbol, intervalSec = 60, limit = 200 }) {
           borderColor: isDark ? '#475569' : '#d1d5db',
           timeVisible: true,
           secondsVisible: false,
-          textColor: isDark ? '#cbd5e1' : '#6b7280'
+          textColor: isDark ? '#cbd5e1' : '#6b7280',
+          tickMarkFormatter: (time) => {
+            if (typeof time === 'object') {
+              const month = String(time.month).padStart(2, '0');
+              const day = String(time.day).padStart(2, '0');
+              return `${day}/${month}`;
+            }
+            const date = new Date(time * 1000);
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+          }
         },
         handleScroll: {
           mouseWheel: true,
@@ -641,6 +659,12 @@ function PriceChartPanel({ symbol, chartType, setChartType, timeRange, setTimeRa
   const selectedRange = RANGE_OPTIONS.find(r => r.id === timeRange) || RANGE_OPTIONS[0];
   return (
     <div className="price-history-panel">
+      <div className="price-chart-header">
+        <div>
+          <div className="chart-title">{symbol} Price History</div>
+          <div className="chart-subtitle">{selectedRange.label} · {chartType === 'candle' ? 'Candlestick' : 'Line'} chart · 1Y max</div>
+        </div>
+      </div>
       <div className="price-history-toolbar">
         <div className="range-buttons">
           {RANGE_OPTIONS.map(range => (

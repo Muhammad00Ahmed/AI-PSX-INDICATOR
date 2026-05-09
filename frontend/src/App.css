@@ -296,6 +296,25 @@ body {
   padding: 16px;
 }
 
+.price-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chart-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
 .price-history-toolbar {
   display: flex;
   justify-content: space-between;
